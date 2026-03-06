@@ -100,22 +100,23 @@ def _bridge_thread(
 
 
 def _discover_socket() -> str | None:
-    """Find daemon socket path."""
-    # 1. SLIPSTREAM_SOCKET env var
+    """Find daemon socket path.
+
+    Matches slipstream-core's default_socket_path():
+      SLIPSTREAM_SOCKET || {XDG_RUNTIME_DIR || TMPDIR || /tmp}/slipstream.sock
+    """
+    # 1. SLIPSTREAM_SOCKET env var (set by daemon when it spawns plugins)
     path = os.environ.get("SLIPSTREAM_SOCKET")
     if path and os.path.exists(path):
         return path
 
-    # 2. XDG_RUNTIME_DIR/slipstream/daemon.sock
-    xdg = os.environ.get("XDG_RUNTIME_DIR")
-    if xdg:
-        path = os.path.join(xdg, "slipstream", "daemon.sock")
-        if os.path.exists(path):
-            return path
-
-    # 3. /tmp/slipstream-{uid}/daemon.sock
-    uid = os.getuid()
-    path = f"/tmp/slipstream-{uid}/daemon.sock"
+    # 2. Default path: {runtime_dir}/slipstream.sock
+    runtime_dir = (
+        os.environ.get("XDG_RUNTIME_DIR")
+        or os.environ.get("TMPDIR")
+        or "/tmp"
+    )
+    path = os.path.join(runtime_dir, "slipstream.sock")
     if os.path.exists(path):
         return path
 

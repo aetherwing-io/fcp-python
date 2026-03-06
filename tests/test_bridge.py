@@ -36,13 +36,26 @@ class TestDiscoverSocket:
             os.environ.update(orig)
 
     def test_xdg_runtime_dir(self, tmp_path):
-        ss_dir = tmp_path / "slipstream"
-        ss_dir.mkdir()
-        sock = ss_dir / "daemon.sock"
+        sock = tmp_path / "slipstream.sock"
         sock.touch()
         orig = os.environ.copy()
         os.environ.pop("SLIPSTREAM_SOCKET", None)
         os.environ["XDG_RUNTIME_DIR"] = str(tmp_path)
+        os.environ.pop("TMPDIR", None)
+        try:
+            result = _discover_socket()
+            assert result == str(sock)
+        finally:
+            os.environ.clear()
+            os.environ.update(orig)
+
+    def test_tmpdir_fallback(self, tmp_path):
+        sock = tmp_path / "slipstream.sock"
+        sock.touch()
+        orig = os.environ.copy()
+        os.environ.pop("SLIPSTREAM_SOCKET", None)
+        os.environ.pop("XDG_RUNTIME_DIR", None)
+        os.environ["TMPDIR"] = str(tmp_path)
         try:
             result = _discover_socket()
             assert result == str(sock)
