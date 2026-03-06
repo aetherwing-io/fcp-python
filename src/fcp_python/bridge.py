@@ -13,6 +13,54 @@ import os
 import threading
 from typing import Any, Awaitable, Callable
 
+_AGENT_HELP = """\
+### python — LSP-powered Python navigation and refactoring
+
+#### Session
+```
+slipstream fcp python "open /path/to/project"
+slipstream fcp python "status"
+slipstream fcp python "close"
+```
+
+#### Navigation
+```
+slipstream fcp python_query "find MyClass"
+slipstream fcp python_query "find process kind:function"
+slipstream fcp python_query "def main @file:src/app.py"
+slipstream fcp python_query "refs Config @file:models.py"
+slipstream fcp python_query "symbols src/utils.py"
+slipstream fcp python_query "impl BaseHandler"
+```
+
+#### Inspection
+```
+slipstream fcp python_query "inspect MyClass"
+slipstream fcp python_query "callers process_data"
+slipstream fcp python_query "callees handle_request"
+slipstream fcp python_query "diagnose"
+slipstream fcp python_query "diagnose src/main.py"
+slipstream fcp python_query "map"
+slipstream fcp python_query "unused @file:src/utils.py"
+```
+
+#### Refactoring
+```
+slipstream fcp python "rename Config Settings"
+slipstream fcp python "extract validate @file:server.py @lines:15-30"
+slipstream fcp python "import os @file:main.py @line:5"
+```
+
+#### Selectors
+- `@file:PATH` — filter by file path
+- `@class:NAME` — filter by containing class
+- `@module:NAME` — filter by module
+- `@kind:KIND` — function, class, method, variable, constant, module, property
+- `@line:N` — filter by line number
+- `@lines:N-M` — line range (for extract)
+- `@decorator:NAME` — filter by decorator (e.g. `@decorator:staticmethod`)
+"""
+
 
 def start_bridge(
     handle_session: Callable[[str], Awaitable[str]],
@@ -91,6 +139,7 @@ async def _run_bridge_at(
             "handler_name": "fcp-py",
             "extensions": ["py"],
             "capabilities": ["ops", "query", "session"],
+            "agent_help": _AGENT_HELP,
         },
     }
     writer.write((json.dumps(register) + "\n").encode())
