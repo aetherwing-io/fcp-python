@@ -1,22 +1,53 @@
-"""Slipstream bridge — connects FCP server to daemon via Unix socket."""
+"""Slipstream bridge — connects FCP server to daemon via Unix socket.
+
+Runs in a daemon thread so it never blocks the main MCP server.
+Silently returns on any connection failure (bridge is invisible
+when Slipstream isn't running).
+"""
 
 from __future__ import annotations
 
 import asyncio
 import json
 import os
+import threading
 from typing import Any, Awaitable, Callable
 
 
-async def connect(
+def start_bridge(
     handle_session: Callable[[str], Awaitable[str]],
     handle_query: Callable[[str], Awaitable[str]],
     handle_mutation: Callable[[list[str]], Awaitable[str]],
 ) -> None:
-    """Connect to slipstream daemon. Silently returns on failure."""
+    """Connect to Slipstream daemon if available.
+
+    Spawns a daemon thread with its own event loop. Silently returns
+    if the socket is not found or any connection error occurs.
+    """
     try:
-        await _run_bridge(handle_session, handle_query, handle_mutation)
-    except Exception:
+        path = _discover_socket()
+        if path is None:
+            return
+        t = threading.Thread(
+            target=_bridge_thread,
+            args=(path, handle_session, handle_query, handle_mutation),
+            daemon=True,
+        )
+        t.start()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _bridge_thread(
+    path: str,
+    handle_session: Callable[[str], Awaitable[str]],
+    handle_query: Callable[[str], Awaitable[str]],
+    handle_mutation: Callable[[list[str]], Awaitable[str]],
+) -> None:
+    """Entry point for the daemon thread."""
+    try:
+        asyncio.run(_run_bridge_at(path, handle_session, handle_query, handle_mutation))
+    except Exception:  # noqa: BLE001
         pass
 
 
@@ -43,16 +74,13 @@ def _discover_socket() -> str | None:
     return None
 
 
-async def _run_bridge(
+async def _run_bridge_at(
+    path: str,
     handle_session: Callable[[str], Awaitable[str]],
     handle_query: Callable[[str], Awaitable[str]],
     handle_mutation: Callable[[list[str]], Awaitable[str]],
 ) -> None:
-    """Connect and handle requests via newline-delimited JSON-RPC."""
-    path = _discover_socket()
-    if path is None:
-        return
-
+    """Async loop: connect, register, then handle NDJSON requests."""
     reader, writer = await asyncio.open_unix_connection(path)
 
     # Send registration

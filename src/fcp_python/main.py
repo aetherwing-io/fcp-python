@@ -261,6 +261,26 @@ def _count_py_files(path: str) -> int:
 
 
 def main() -> None:
+    # Spawn slipstream bridge in background (silent no-op if daemon not running)
+    from fcp_python.bridge import start_bridge
+
+    async def _bridge_session(action: str) -> str:
+        async with _lock:
+            return await _handle_session(action)
+
+    async def _bridge_query(q: str) -> str:
+        async with _lock:
+            return await dispatch_query(_model, _registry, q)
+
+    async def _bridge_mutation(ops: list[str]) -> str:
+        async with _lock:
+            results = []
+            for op in ops:
+                results.append(await dispatch_mutation(_model, _registry, op))
+            return "\n\n".join(results)
+
+    start_bridge(_bridge_session, _bridge_query, _bridge_mutation)
+
     mcp.run()
 
 
