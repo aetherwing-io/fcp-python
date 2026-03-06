@@ -74,8 +74,6 @@ def start_bridge(
     """
     try:
         path = _discover_socket()
-        if path is None:
-            return None
         t = threading.Thread(
             target=_bridge_thread,
             args=(path, handle_session, handle_query, handle_mutation),
@@ -100,28 +98,23 @@ def _bridge_thread(
         pass
 
 
-def _discover_socket() -> str | None:
+def _discover_socket() -> str:
     """Find daemon socket path.
 
     Matches slipstream-core's default_socket_path():
       SLIPSTREAM_SOCKET || {XDG_RUNTIME_DIR || TMPDIR || /tmp}/slipstream.sock
-    """
-    # 1. SLIPSTREAM_SOCKET env var (set by daemon when it spawns plugins)
-    path = os.environ.get("SLIPSTREAM_SOCKET")
-    if path and os.path.exists(path):
-        return path
 
-    # 2. Default path: {runtime_dir}/slipstream.sock
+    Always returns a path — the connection attempt is the real test.
+    """
+    path = os.environ.get("SLIPSTREAM_SOCKET")
+    if path:
+        return path
     runtime_dir = (
         os.environ.get("XDG_RUNTIME_DIR")
         or os.environ.get("TMPDIR")
         or "/tmp"
     )
-    path = os.path.join(runtime_dir, "slipstream.sock")
-    if os.path.exists(path):
-        return path
-
-    return None
+    return os.path.join(runtime_dir, "slipstream.sock")
 
 
 async def _run_bridge_at(
@@ -130,8 +123,17 @@ async def _run_bridge_at(
     handle_query: Callable[[str], Awaitable[str]],
     handle_mutation: Callable[[list[str]], Awaitable[str]],
 ) -> None:
-    """Async loop: connect, register, then handle NDJSON requests."""
-    reader, writer = await asyncio.open_unix_connection(path)
+    """Async loop: connect with retry, register, then handle NDJSON requests."""
+    delays = [0.1, 0.2, 0.5, 1.0, 2.0]
+    reader = writer = None
+    for delay in delays:
+        try:
+            reader, writer = await asyncio.open_unix_connection(path)
+            break
+        except (ConnectionRefusedError, FileNotFoundError, OSError):
+            await asyncio.sleep(delay)
+    if writer is None:
+        return
 
     # Send registration
     register = {
