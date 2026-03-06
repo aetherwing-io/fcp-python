@@ -279,7 +279,17 @@ def main() -> None:
                 results.append(await dispatch_mutation(_model, _registry, op))
             return "\n\n".join(results)
 
-    start_bridge(_bridge_session, _bridge_query, _bridge_mutation)
+    bridge_thread = start_bridge(_bridge_session, _bridge_query, _bridge_mutation)
+
+    # Bridge-only mode: when spawned by slipstream (stdin is /dev/null),
+    # mcp.run() would get immediate EOF and exit, killing the bridge thread.
+    # Instead, block on the bridge thread directly.
+    if os.environ.get("SLIPSTREAM_SOCKET") and not os.isatty(0):
+        if bridge_thread is not None:
+            bridge_thread.join()
+            return
+        # No bridge thread means socket wasn't found — nothing to do
+        return
 
     mcp.run()
 

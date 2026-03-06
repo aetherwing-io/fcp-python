@@ -66,24 +66,25 @@ def start_bridge(
     handle_session: Callable[[str], Awaitable[str]],
     handle_query: Callable[[str], Awaitable[str]],
     handle_mutation: Callable[[list[str]], Awaitable[str]],
-) -> None:
+) -> threading.Thread | None:
     """Connect to Slipstream daemon if available.
 
-    Spawns a daemon thread with its own event loop. Silently returns
-    if the socket is not found or any connection error occurs.
+    Spawns a daemon thread with its own event loop. Returns the thread
+    (for join in bridge-only mode) or None if no socket found.
     """
     try:
         path = _discover_socket()
         if path is None:
-            return
+            return None
         t = threading.Thread(
             target=_bridge_thread,
             args=(path, handle_session, handle_query, handle_mutation),
             daemon=True,
         )
         t.start()
+        return t
     except Exception:  # noqa: BLE001
-        pass
+        return None
 
 
 def _bridge_thread(
@@ -137,9 +138,9 @@ async def _run_bridge_at(
         "jsonrpc": "2.0",
         "method": "fcp.register",
         "params": {
-            "handler_name": "fcp-py",
+            "handler_name": "fcp-python",
             "extensions": ["py"],
-            "capabilities": ["ops", "query", "session"],
+            "capabilities": {"ops": True, "query": True, "session": True},
             "agent_help": _AGENT_HELP,
         },
     }
