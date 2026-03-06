@@ -1,0 +1,11 @@
+{
+  "name": "fcp-python",
+  "description": "Query and refactor Python codebases through intent-level commands",
+  "version": "0.1.0",
+  "license": "MIT",
+  "author": {
+    "name": "Scott Meyer"
+  },
+  "repository": "https://github.com/aetherwing-io/fcp-python",
+  "keywords": ["python", "pylsp", "refactoring", "code-intelligence", "mcp"]
+}
