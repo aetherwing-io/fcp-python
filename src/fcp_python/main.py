@@ -26,11 +26,13 @@ from fcp_python.lsp.types import PublishDiagnosticsParams, SymbolInformation
 from fcp_python.resolver.index import SymbolEntry, SymbolIndex
 
 mcp = FastMCP(
-    "python-fcp",
+    "fcp-python",
     instructions=(
-        "FCP Python server for querying Python codebases via pylsp. "
-        "Use python_session to open a workspace, python_query for read-only queries, "
-        "and python_help for the reference card."
+        "FCP Python server for querying and refactoring Python codebases via pylsp. "
+        "Use python_session to open a workspace directory containing Python files, "
+        "python_query for read-only queries like finding definitions, references, "
+        "diagnostics, and symbols, python for refactoring operations, and python_help "
+        "for the full verb reference. Start every interaction with python_session."
     ),
 )
 
